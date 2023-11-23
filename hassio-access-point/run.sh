@@ -74,6 +74,26 @@ echo "netmask $NETMASK"$'\n' >> /etc/network/interfaces
 logger "Add to /etc/network/interfaces: broadcast $BROADCAST" 1
 echo "broadcast $BROADCAST"$'\n' >> /etc/network/interfaces
 
+# Define your Ethernet and WiFi interfaces
+eth_interface="eth0" # Replace with your Ethernet interface name, if different
+wifi_interface=$INTERFACE
+
+# Create a bridge interface
+br_interface="br0"
+ip link add name $br_interface type bridge
+
+# Add your Ethernet and WiFi interfaces to the bridge
+ip link set $eth_interface master $br_interface
+ip link set $wifi_interface master $br_interface
+
+# Assign IP address to the bridge interface (using the details from Ethernet or as per your network configuration)
+ip addr add $ADDRESS/$NETMASK dev $br_interface
+ip link set $br_interface up
+
+# Now, enable IP forwarding and set up NAT
+echo 1 > /proc/sys/net/ipv4/ip_forward
+iptables-nft -t nat -A POSTROUTING -o $DEFAULT_ROUTE_INTERFACE -j MASQUERADE
+
 logger "Run command: ip link set $INTERFACE up" 1
 ip link set $INTERFACE up
 
@@ -151,7 +171,7 @@ if [ ${#ALLOW_MAC_ADDRESSES} -ge 1 ]; then
 fi
 
 # Set address for the selected interface. Not sure why this is now not being set via /etc/network/interfaces, but maybe interfaces file is no longer required...
-ifconfig $INTERFACE $ADDRESS netmask $NETMASK broadcast $BROADCAST
+# ifconfig $INTERFACE $ADDRESS netmask $NETMASK broadcast $BROADCAST
 
 # Add interface to hostapd.conf
 logger "Add to hostapd.conf: interface=$INTERFACE" 1
